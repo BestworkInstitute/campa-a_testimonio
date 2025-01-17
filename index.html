@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Envio de Mensajes</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 800px;
+            padding: 20px;
+            text-align: center;
+        }
+        button {
+            background-color: #FF7F50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 10px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .table-container {
+            overflow-x: auto;
+            max-height: 300px;
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        th {
+            background-color: #FF7F50;
+            color: white;
+        }
+        #consoleOutput {
+            margin-top: 20px;
+            background: #1e293b;
+            color: #34d399;
+            padding: 10px;
+            border-radius: 8px;
+            overflow-y: auto;
+            max-height: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="text-2xl font-bold mb-4">Carga de Datos y Envío de Mensajes</h2>
+        <input type="file" id="fileInput" accept=".csv, .xlsx" class="mb-4 border-2 border-blue-400 p-2 rounded-lg">
+        <button onclick="processFile()" class="bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg transition duration-300">Cargar Archivo</button>
+
+        <div id="tableContainer" class="table-container hidden">
+            <table>
+                <thead>
+                    <tr>
+                        <th>RUT</th>
+                        <th>Nombre Completo</th>
+                        <th>Correo Electrónico</th>
+                        <th>Celular</th>
+                        <th>Contrato</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+
+        <button id="sendMessagesBtn" class="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg hidden" onclick="sendMessages()">Enviar Mensajes</button>
+        <div id="consoleOutput" class="mt-6"></div>
+    </div>
+
+    <script>
+        let dataRows = []; // Array to hold parsed rows
+
+        // Procesar el archivo cargado
+        function processFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Por favor selecciona un archivo.');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const data = new Uint8Array(event.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+                // Eliminar la fila de encabezados
+                dataRows = jsonData.slice(1);
+                displayTable(dataRows);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Mostrar los datos cargados en una tabla
+        function displayTable(rows) {
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = '';
+
+            rows.forEach((row, index) => {
+                const rowHtml = `
+                    <tr>
+                        <td>${row[0] || "N/A"}</td>
+                        <td>${row[1] || "N/A"}</td>
+                        <td>${row[2] || "N/A"}</td>
+                        <td>${row[3] || "N/A"}</td>
+                        <td>${row[4] || "N/A"}</td>
+                    </tr>
+                `;
+                tableBody.innerHTML += rowHtml;
+            });
+
+            document.getElementById('tableContainer').classList.remove('hidden');
+            document.getElementById('sendMessagesBtn').classList.remove('hidden');
+        }
+
+        // Enviar mensajes al API
+        async function sendMessages() {
+            const flow = "61a7a0ab-eee2-47b4-bfe2-fd1acb6a3c5a";
+
+            for (const row of dataRows) {
+                // Validar que la fila tenga al menos 5 columnas
+                if (row.length < 5) {
+                    logToConsole("Fila inválida o incompleta. Se omitió.");
+                    continue;
+                }
+
+                // Desestructurar y validar datos
+                const [RUT, NOMBRE, CORREO, CELULAR, CONTRATO] = row.map(cell => cell || "").map(String);
+
+                if (!CELULAR.trim()) {
+                    logToConsole(`Celular no válido para ${NOMBRE}. Se omitió.`);
+                    continue;
+                }
+
+                // Limpiar el número celular
+                const celularLimpio = CELULAR.replace(/\D/g, "");
+
+                // Crear los parámetros
+                const url = `https://flows.messagebird.com/flows/${flow}/invoke`;
+                const headers = {
+                    RUT,
+                    NOMBRE,
+                    CORREO,
+                    CELULAR: celularLimpio,
+                    CONTRATO
+                };
+
+                try {
+                    await axios.post(url, null, { params: headers });
+                    logToConsole(`Mensaje enviado a ${NOMBRE} (${celularLimpio}).`);
+                } catch (error) {
+                    logToConsole(`Error enviando mensaje a ${NOMBRE} (${celularLimpio}): ${error.message}`);
+                }
+            }
+        }
+
+        // Mostrar mensajes en el panel de consola
+        function logToConsole(message) {
+            const consoleOutput = document.getElementById('consoleOutput');
+            const timestamp = new Date().toLocaleTimeString();
+            consoleOutput.innerHTML += `<p>[${timestamp}] ${message}</p>`;
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+    </script>
+</body>
+</html>
