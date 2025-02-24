@@ -140,44 +140,68 @@
             document.getElementById('sendMessagesBtn').classList.remove('hidden');
         }
 
-        // Enviar mensajes al API
-        async function sendMessages() {
-            const flow = "61a7a0ab-eee2-47b4-bfe2-fd1acb6a3c5a";
+        // Función para pausar la ejecución
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-            for (const row of dataRows) {
-                // Validar que la fila tenga al menos 5 columnas
-                if (row.length < 5) {
-                    logToConsole("Fila inválida o incompleta. Se omitió.");
-                    continue;
-                }
+// Enviar mensajes al API en lotes de 50 con pausa de 15 minutos entre ellos
+async function sendMessages() {
+    const flow = "61a7a0ab-eee2-47b4-bfe2-fd1acb6a3c5a";
+    const batchSize = 50; // Tamaño del lote
+    const delayTime = 15 * 60 * 1000; // 15 minutos en milisegundos
 
-                // Desestructurar y validar datos
-                const [RUT, NOMBRE, CORREO, CELULAR, CONTRATO] = row.map(cell => cell || "").map(String);
+    let index = 0;
+    while (index < dataRows.length) {
+        const batch = dataRows.slice(index, index + batchSize); // Obtener lote de 50 contactos
+        index += batchSize; // Mover índice al siguiente lote
 
-                if (!CELULAR.trim()) {
-                    logToConsole(`Celular no válido para ${NOMBRE}. Se omitió.`);
-                    continue;
-                }
+        for (const row of batch) {
+            // Validar que la fila tenga al menos 5 columnas
+            if (row.length < 5) {
+                logToConsole("Fila inválida o incompleta. Se omitió.");
+                continue;
+            }
 
-                // Limpiar el número celular
-                const celularLimpio = CELULAR.replace(/\D/g, "");
+            // Desestructurar y validar datos
+            const [RUT, NOMBRE, CORREO, CELULAR, CONTRATO] = row.map(cell => cell || "").map(String);
 
-                // Crear los parámetros
-                const url = `https://flows.messagebird.com/flows/${flow}/invoke`;
-                const headers = {
-                    RUT,
-                    NOMBRE,
-                    CORREO,
-                    CELULAR: celularLimpio,
-                    CONTRATO
-                };
+            if (!CELULAR.trim()) {
+                logToConsole(`Celular no válido para ${NOMBRE}. Se omitió.`);
+                continue;
+            }
 
-                try {
-                    await axios.post(url, null, { params: headers });
-                    logToConsole(`Mensaje enviado a ${NOMBRE} (${celularLimpio}).`);
-                } catch (error) {
-                    logToConsole(`Error enviando mensaje a ${NOMBRE} (${celularLimpio}): ${error.message}`);
-                }
+            // Limpiar el número celular
+            const celularLimpio = CELULAR.replace(/\D/g, "");
+
+            // Crear los parámetros
+            const url = `https://flows.messagebird.com/flows/${flow}/invoke`;
+            const headers = {
+                RUT,
+                NOMBRE,
+                CORREO,
+                CELULAR: celularLimpio,
+                CONTRATO
+            };
+
+            try {
+                await axios.post(url, null, { params: headers });
+                logToConsole(`Mensaje enviado a ${NOMBRE} (${celularLimpio}).`);
+            } catch (error) {
+                logToConsole(`Error enviando mensaje a ${NOMBRE} (${celularLimpio}): ${error.message}`);
+            }
+        }
+
+        // Si aún hay más contactos por procesar, esperar 15 minutos
+        if (index < dataRows.length) {
+            logToConsole(`Esperando 15 minutos antes de continuar con el siguiente lote...`);
+            await delay(delayTime);
+        }
+    }
+
+    logToConsole("Todos los mensajes han sido enviados.");
+}
+
             }
         }
 
