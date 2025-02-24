@@ -92,7 +92,7 @@
     </div>
 
     <script>
-        let dataRows = []; // Array to hold parsed rows
+        let dataRows = []; // Array para almacenar los datos
 
         // Procesar el archivo cargado
         function processFile() {
@@ -123,7 +123,7 @@
             const tableBody = document.getElementById('tableBody');
             tableBody.innerHTML = '';
 
-            rows.forEach((row, index) => {
+            rows.forEach((row) => {
                 const rowHtml = `
                     <tr>
                         <td>${row[0] || "N/A"}</td>
@@ -141,71 +141,56 @@
         }
 
         // Función para pausar la ejecución
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// Enviar mensajes al API en lotes de 50 con pausa de 15 minutos entre ellos
-async function sendMessages() {
-    const flow = "61a7a0ab-eee2-47b4-bfe2-fd1acb6a3c5a";
-    const batchSize = 1; // Tamaño del lote
-    const delayTime = 15 * 60 * 1000; // 15 minutos en milisegundos
-
-    let index = 0;
-    while (index < dataRows.length) {
-        const batch = dataRows.slice(index, index + batchSize); // Obtener lote de 50 contactos
-        index += batchSize; // Mover índice al siguiente lote
-
-        for (const row of batch) {
-            // Validar que la fila tenga al menos 5 columnas
-            if (row.length < 5) {
-                logToConsole("Fila inválida o incompleta. Se omitió.");
-                continue;
-            }
-
-            // Desestructurar y validar datos
-            const [RUT, NOMBRE, CORREO, CELULAR, CONTRATO] = row.map(cell => cell || "").map(String);
-
-            if (!CELULAR.trim()) {
-                logToConsole(`Celular no válido para ${NOMBRE}. Se omitió.`);
-                continue;
-            }
-
-            // Limpiar el número celular
-            const celularLimpio = CELULAR.replace(/\D/g, "");
-
-            // Crear los parámetros
-            const url = `https://flows.messagebird.com/flows/${flow}/invoke`;
-            const headers = {
-                RUT,
-                NOMBRE,
-                CORREO,
-                CELULAR: celularLimpio,
-                CONTRATO
-            };
-
-            try {
-                await axios.post(url, null, { params: headers });
-                logToConsole(`Mensaje enviado a ${NOMBRE} (${celularLimpio}).`);
-            } catch (error) {
-                logToConsole(`Error enviando mensaje a ${NOMBRE} (${celularLimpio}): ${error.message}`);
-            }
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
         }
 
-        // Si aún hay más contactos por procesar, esperar 15 minutos
-        if (index < dataRows.length) {
-            logToConsole(`Esperando 15 minutos antes de continuar con el siguiente lote...`);
-            await delay(delayTime);
-        }
-    }
+        // Enviar mensajes al API en lotes de 50 con pausa de 15 minutos entre ellos
+        async function sendMessages() {
+            const flow = "61a7a0ab-eee2-47b4-bfe2-fd1acb6a3c5a";
+            const batchSize = 50; // Tamaño del lote
+            const delayTime = 15 * 60 * 1000; // 15 minutos en milisegundos
 
-    logToConsole("Todos los mensajes han sido enviados.");
-}
+            let index = 0;
+            while (index < dataRows.length) {
+                const batch = dataRows.slice(index, index + batchSize);
+                index += batchSize;
 
+                for (const row of batch) {
+                    if (row.length < 5) {
+                        logToConsole("Fila inválida o incompleta. Se omitió.");
+                        continue;
+                    }
+
+                    const [RUT, NOMBRE, CORREO, CELULAR, CONTRATO] = row.map(cell => cell || "").map(String);
+
+                    if (!CELULAR.trim()) {
+                        logToConsole(`Celular no válido para ${NOMBRE}. Se omitió.`);
+                        continue;
+                    }
+
+                    const celularLimpio = CELULAR.replace(/\D/g, "");
+
+                    const url = `https://flows.messagebird.com/flows/${flow}/invoke`;
+                    const headers = { RUT, NOMBRE, CORREO, CELULAR: celularLimpio, CONTRATO };
+
+                    try {
+                        await axios.post(url, null, { params: headers });
+                        logToConsole(`Mensaje enviado a ${NOMBRE} (${celularLimpio}).`);
+                    } catch (error) {
+                        logToConsole(`Error enviando mensaje a ${NOMBRE} (${celularLimpio}): ${error.message}`);
+                    }
+                }
+
+                if (index < dataRows.length) {
+                    logToConsole(`Esperando 15 minutos antes de continuar...`);
+                    await delay(delayTime);
+                }
             }
+
+            logToConsole("Todos los mensajes han sido enviados.");
         }
 
-        // Mostrar mensajes en el panel de consola
         function logToConsole(message) {
             const consoleOutput = document.getElementById('consoleOutput');
             const timestamp = new Date().toLocaleTimeString();
