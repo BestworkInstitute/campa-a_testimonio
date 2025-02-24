@@ -148,7 +148,7 @@ function delay(ms) {
 // Enviar mensajes al API en lotes de 50 con pausa de 15 minutos entre ellos
 async function sendMessages() {
     const flow = "61a7a0ab-eee2-47b4-bfe2-fd1acb6a3c5a";
-    const batchSize = 50; // Tamaño del lote
+    const batchSize = 1; // Tamaño del lote
     const delayTime = 15 * 60 * 1000; // 15 minutos en milisegundos
 
     let index = 0;
